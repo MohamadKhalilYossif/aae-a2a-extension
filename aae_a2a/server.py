@@ -16,6 +16,8 @@ errors and create no task.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import threading
 from dataclasses import dataclass, field
@@ -52,7 +54,7 @@ from a2a.utils.errors import ExtensionSupportRequiredError, InvalidParamsError
 from .challenge import ChallengeError, SubjectBinding, utc_now
 from .constants import A2A_EXTENSIONS_HEADER, AAE_DRAFT, EXTENSION_URI, MAX_ANCESTORS
 from .didres import LocalDidResolver
-from .digest import request_digest
+from .digest import request_bytes, request_digest
 from . import enforce
 from .verifier import STEP_NAMES, AaeVerifier, Accepted, Reject
 
@@ -241,6 +243,49 @@ class _Pending:
     request_digest: str
 
 
+class HandoffMismatch(Exception):
+    """A decision was handed to a task it was not made for. Raised before the
+    skill runs and before the task changes state."""
+
+    def __init__(self, reason: str, detail: str = ""):
+        super().__init__(f"{reason}: {detail}" if detail else reason)
+        self.reason = reason
+
+
+@dataclass(frozen=True)
+class Decision:
+    """The accepted outcome of section 5 for one task and one frozen request.
+
+    The verifier-to-executor handoff passes this object and nothing else that
+    describes the request: the skill is invoked with the request decoded from
+    request_bytes, never with a request taken from the receiving context. A
+    decision is bound to the task it was verified on; _dispatch refuses it on
+    any other task (spec 8.5: request_digest identifies content, the task id
+    the execution)."""
+    task_id: str
+    skill: str
+    action: str
+    request_digest: str
+    request_bytes: bytes
+    accepted: Accepted
+    verified_at: object
+
+    @classmethod
+    def bind(cls, task_id: str, p: "_Pending", accepted: Accepted, now, action: str) -> "Decision":
+        raw = request_bytes({"skill": p.skill, "transaction": p.transaction})
+        if "sha256:" + hashlib.sha256(raw).hexdigest() != p.request_digest:
+            raise HandoffMismatch("request_not_frozen",
+                                  "the pending request no longer matches its frozen digest")
+        return cls(task_id=task_id, skill=p.skill, action=action,
+                   request_digest=p.request_digest, request_bytes=raw,
+                   accepted=accepted, verified_at=now)
+
+    def frozen_request(self) -> dict:
+        if "sha256:" + hashlib.sha256(self.request_bytes).hexdigest() != self.request_digest:
+            raise HandoffMismatch("request_not_frozen", self.request_digest)
+        return json.loads(self.request_bytes)
+
+
 @dataclass
 class _Held:
     pending: _Pending
@@ -370,11 +415,19 @@ class SupplierExecutor(AgentExecutor):
         if accepted.held:
             await self._hold(updater, p, accepted)
             return
-        await self._perform(updater, p, accepted, now, action)
+        await self._dispatch(updater, Decision.bind(updater.task_id, p, accepted, now, action))
 
-    async def _perform(self, updater: TaskUpdater, p: _Pending, accepted, now, action,
-                       ratification: dict | None = None) -> None:
-        tx = p.transaction
+    async def _dispatch(self, updater: TaskUpdater, decision: Decision,
+                        ratification: dict | None = None) -> None:
+        """The verifier-to-executor handoff. Everything the skill receives comes
+        from the decision; the receiving context contributes only where the
+        outcome is reported, and it must be the task the decision was made on."""
+        if updater.task_id != decision.task_id:
+            raise HandoffMismatch("decision_task_mismatch",
+                                  f"decision for task {decision.task_id} handed to {updater.task_id}")
+        req = decision.frozen_request()
+        accepted, now, action = decision.accepted, decision.verified_at, decision.action
+        tx = req["transaction"]
         receipt = {
             "verdict": "ACCEPT",
             "draft": AAE_DRAFT,
@@ -382,10 +435,10 @@ class SupplierExecutor(AgentExecutor):
             "aae_id": accepted.vc["id"],
             "issuer": accepted.root_vc["issuer"],
             "subject": accepted.vc["credentialSubject"]["id"],
-            "skill": p.skill,
+            "skill": req["skill"],
             "action": action,
             "verified_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "request_digest": p.request_digest,
+            "request_digest": decision.request_digest,
         }
         if accepted.enforce_result is not None:
             receipt["enforce"] = _enforce_view(accepted.enforce_result)
@@ -396,18 +449,18 @@ class SupplierExecutor(AgentExecutor):
         await updater.update_status(TaskState.TASK_STATE_WORKING,
                                     metadata={EXTENSION_URI: {"result": receipt}})
         try:
-            output = self.perform(p.skill, tx)
+            output = self.perform(req["skill"], tx)
         except SkillFailed as exc:
             self._observe(updater, receipt, TaskState.TASK_STATE_FAILED)
             await updater.failed(message=updater.new_agent_message(parts=[Part(
-                text=f"{p.skill} failed: {exc.reason}. AAE {accepted.vc['id']} was verified; "
+                text=f"{req['skill']} failed: {exc.reason}. AAE {accepted.vc['id']} was verified; "
                      "the failure is the skill's, not the authorization's.")]))
             return
         await updater.add_artifact(parts=[Part(data=_to_value(output))],
                                    name="result", last_chunk=True)
         self._observe(updater, receipt, TaskState.TASK_STATE_COMPLETED)
         await updater.complete(message=updater.new_agent_message(
-            parts=[Part(text=f"{p.skill} done; AAE {accepted.vc['id']} verified.")]))
+            parts=[Part(text=f"{req['skill']} done; AAE {accepted.vc['id']} verified.")]))
 
     async def _hold(self, updater: TaskUpdater, p: _Pending, accepted) -> None:
         """PENDING at step 6, every other step passed: hold the task (spec 7.6)."""
@@ -475,8 +528,9 @@ class SupplierExecutor(AgentExecutor):
         steps = sorted(set(h.steps) | {6})
         accepted = Accepted(vc=vc, root_vc=h.root_vc, last_step=steps[-1],
                             enforce_result=h.enforce_result, steps=steps)
-        await self._perform(updater, p, accepted, now, self.cfg.skills[p.skill]["action"],
-                            ratification=view)
+        decision = Decision.bind(updater.task_id, p, accepted, now,
+                                 self.cfg.skills[p.skill]["action"])
+        await self._dispatch(updater, decision, ratification=view)
 
     def _observe(self, updater: TaskUpdater, result: dict, state: int) -> None:
         if self.observer is not None:
