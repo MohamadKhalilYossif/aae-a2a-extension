@@ -23,6 +23,7 @@ its own.
 | Date | Participant | Role | Cases (commit) | Client (commit) | Server (commit) | Result | File |
 | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
 | 2026-10-30 | [Prasanna Bableshwar](https://github.com/bprasana/aae-a2a-crossrun) | offline | [`6c857ee`](https://github.com/MoltyCel/aae-a2a-extension/commit/6c857eeb60a9dac379954f5be5900a10616dfc7b) | receiver [`04cc8c5`](https://github.com/bprasana/aae-a2a-crossrun/commit/04cc8c5966b8a1a4f63495a4e4ce6d71f8f3cdc7) | none (offline) | 13 pass, 0 fail | [2026-10-30-prasanna-bableshwar-offline.json](2026-10-30-prasanna-bableshwar-offline.json) |
+| — | Songbo Bu | client | [`08f4114`](https://github.com/MoltyCel/aae-a2a-extension/commit/08f41146ac0d24d0d3e6212256fd9f3f58079adb) | — | — | "Songbo Bu: separately written raw JSON-RPC client against the reference supplier at 08f41146, XR-01 to XR-06, XR-20 and XR-24 as expected" | — |
 
 The limits of that run, in the participant's own words
 ([findings.md](https://github.com/bprasana/aae-a2a-crossrun/blob/04cc8c5966b8a1a4f63495a4e4ce6d71f8f3cdc7/findings.md)):
