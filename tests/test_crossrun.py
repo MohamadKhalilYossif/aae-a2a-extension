@@ -374,3 +374,38 @@ def test_credit_table_names_the_state_of_the_cases():
     header = next(line for line in (ROOT / "crossruns" / "README.md").read_text().splitlines()
                   if line.startswith("| Date |"))
     assert "| Cases (commit) |" in header
+
+
+# --- XR-04 is an exception to the client rule of spec 6.4 (CROSSRUN.md 4) -----------
+
+BASE_08F41146 = "08f41146ac0d24d0d3e6212256fd9f3f58079adb"
+
+
+def test_xr04_is_marked_as_the_exception_to_the_client_rule():
+    spec, _ = _cases()
+    case = next(c for c in spec["cases"] if c["id"] == "XR-04")
+    amount = case["request_part"]["transaction"]["amount"]
+    assert isinstance(amount, float) and amount == 120
+    assert case["client_side"] == "optional"
+    assert "spec 6.4" in case["client_rule_exception"]
+    assert "XR-04 is an exception to the client rule of spec Section 6.4" in \
+        (ROOT / "CROSSRUN.md").read_text()
+
+
+def _without_xr04(results):
+    return [{"id": r["id"], "result": "skipped"} if r["id"] == "XR-04" else r for r in results]
+
+
+def test_a_client_run_may_skip_xr04(env):
+    spec, digest = _cases()
+    doc = _doc(_without_xr04(_reference_results(env)))
+    assert crossrun.check_result(doc, spec, digest) == []
+
+
+def test_xr04_stays_required_for_a_run_against_08f41146(env):
+    old, digest = crossrun.load_cases_at(BASE_08F41146)
+    full = {**_doc(_reference_results(env)), "cases_commit": BASE_08F41146, "cases_sha256": digest}
+    assert crossrun.check_reported(full) == []
+    skipped = _without_xr04(full["cases"])
+    doc = {**full, "cases": skipped, "summary": crossrun.summarize(skipped)}
+    assert "XR-04 is required and was skipped" in crossrun.check_reported(doc)

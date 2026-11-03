@@ -157,7 +157,7 @@ cases. A `client` run must cover the `required` ones and may skip the
 | XR-01 | required | `valid` / `valid` | `{"amount": 120, "currency": "EUR", "items": [{"sku": "PAPER-A4", "qty": 20}]}` | `TASK_STATE_COMPLETED`, `ACCEPT` | `sha256:84559612f1f46ec0a03f8c448905af075ba4edf66e529b15b50f69c85a68b59a` |
 | XR-02 | required | `valid` / `valid` | `{"amount": 80, "currency": "EUR", "items": [{"sku": "DESK-02", "qty": 1}]}` | `TASK_STATE_FAILED`, `ACCEPT` | `sha256:97ff82c176abd81ff1260c0885e3e25c2e651f153c6f4bcb8c6263e77d55198b` |
 | XR-03 | required | `valid` / `valid` | `{"amount": 900, "currency": "EUR"}` | `TASK_STATE_REJECTED`, `REJECT`, step 7, `max_transaction_value_exceeded` | `sha256:edf9dc35873b6b0f0c46f8aeead5193a7dc97bcdecc6116ae68899b75e0e86d6` |
-| XR-04 | required | `valid` / `valid` | `{"note": "Bürobedarf", "unit_price": 6.25, "amount": 120.0, "currency": "EUR"}` | `TASK_STATE_COMPLETED`, `ACCEPT` | `sha256:20673ecb3bc45abe8dd1aa5455aa90397eb769e42f9af1cff56680f4204eb0c1` |
+| XR-04 | optional | `valid` / `valid` | `{"note": "Bürobedarf", "unit_price": 6.25, "amount": 120.0, "currency": "EUR"}` | `TASK_STATE_COMPLETED`, `ACCEPT` | `sha256:20673ecb3bc45abe8dd1aa5455aa90397eb769e42f9af1cff56680f4204eb0c1` |
 | XR-05 | required | `valid` / `valid` | `{"amount": 120, "currency": "EUR"}` | `TASK_STATE_COMPLETED`, `ACCEPT` | `sha256:7081684b67799fdd4045a25d028f770a8254746ff279dbabb0486bdb7eeb4176` |
 | XR-06 | required | `valid` / `valid` | `{"amount": 120, "currency": "EUR", "items": [{"sku": "PAPER-A4", "qty": 20}]}` | `TASK_STATE_COMPLETED`, `ACCEPT`, task id differs from XR-01's | `sha256:84559612f1f46ec0a03f8c448905af075ba4edf66e529b15b50f69c85a68b59a` |
 | XR-07 | optional | `forged` / `valid` | `{"amount": 120, "currency": "EUR"}` | `TASK_STATE_REJECTED`, `REJECT`, step 1, `invalid_signature` | `sha256:7081684b67799fdd4045a25d028f770a8254746ff279dbabb0486bdb7eeb4176` |
@@ -213,6 +213,16 @@ The `request_digest` column is the value of spec Section 8.5 for that request
 part; the result of a rejection carries it as well (spec 8.2). XR-04 uses the
 member order, `120.0` and non-ASCII string of vector B.2, so it fails if
 either side hashes something other than the JCS form of the request part.
+
+XR-04 is an exception to the client rule of spec Section 6.4 and tests the
+server's side of it. A conforming client encodes integer-valued fields as JSON
+integers, so it sends `120`, not `120.0`. XR-04 sends `120.0` on purpose: the
+server must treat a number with an integral value as an integer, and since JCS
+serializes `120.0` and `120` alike, `request_digest` is the same for both. A
+client-side run may therefore skip XR-04. A client that runs it sends `120.0`
+as written in `cases.json`, outside its own rule, only for this case. In the
+cases of commit `08f41146` XR-04 is still required for a client-side run; a
+run against those cases is checked with them (Section 7.1) and stays valid.
 
 ## 5. Running
 
