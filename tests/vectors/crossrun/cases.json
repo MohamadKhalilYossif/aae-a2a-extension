@@ -41,8 +41,9 @@
     },
     {
       "id": "XR-04",
-      "title": "request_digest canonicalization: member order, 120.0, a fraction, non-ASCII (vector B.2)",
-      "client_side": "required",
+      "title": "Server tolerance for 120.0 (spec 6.4) and request_digest canonicalization: member order, a fraction, non-ASCII (vector B.2)",
+      "client_side": "optional",
+      "client_rule_exception": "spec 6.4: a conforming client encodes integer-valued fields as JSON integers and sends 120. This case sends 120.0 on purpose, to test that the server treats it as the integer 120. It is therefore optional for a client-side run.",
       "request_part": {"transaction": {"note": "Bürobedarf", "unit_price": 6.25, "amount": 120.0, "currency": "EUR"}, "skill": "place-order"},
       "aae": "valid", "challenge_response": "valid", "activate": true,
       "expect": {"kind": "task", "task_state": "TASK_STATE_COMPLETED", "verdict": "ACCEPT",
