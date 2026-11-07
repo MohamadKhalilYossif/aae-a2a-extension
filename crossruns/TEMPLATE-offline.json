@@ -10,6 +10,7 @@
     "name": "<name to credit>",
     "url": "<optional: your project or profile URL>"
   },
+  "receiver_provenance": "<clean_room, reference_informed or unknown>",
   "receiver": {
     "implementation": "<name of the receiver>",
     "version": "<version of the receiver>",

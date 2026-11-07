@@ -48,6 +48,10 @@ _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 # The audience of an offline receiver run, which has no endpoint to name: the
 # value of the spec's Section 4 example (CROSSRUN.md, "Audience").
 OFFLINE_AUDIENCE = "https://supplier.example/a2a/jsonrpc"
+# How the implementation the participant built was written, as the participant
+# states it (CROSSRUN.md Section 6). Absent or unstated is "unknown"; the case
+# counts never stand in for it.
+RECEIVER_PROVENANCE = ("clean_room", "reference_informed", "unknown")
 
 
 def load_cases(path: Path = CASES_FILE) -> tuple[dict, str]:
@@ -385,6 +389,7 @@ def cmd_client(a) -> int:
         "cases_sha256": cases_digest,
         "run_at": utc_now().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "participant": {"name": a.participant, "url": a.participant_url},
+        "receiver_provenance": a.receiver_provenance,
         "client": {"implementation": "aae-a2a-extension reference buyer",
                    "repository": REFERENCE_REPO, "commit": commit,
                    **({"dirty": True} if dirty else {})},
@@ -418,6 +423,12 @@ def check_result(doc: dict, spec: dict, cases_digest: str) -> list[str]:
                     "cases_commit")
     if not (doc.get("participant") or {}).get("name"):
         errs.append("participant.name missing")
+    if "receiver_provenance" not in doc:
+        errs.append("receiver_provenance missing (clean_room, reference_informed or unknown; "
+                    "unknown if the participant has not stated it)")
+    elif doc["receiver_provenance"] not in RECEIVER_PROVENANCE:
+        errs.append(f"receiver_provenance {doc['receiver_provenance']!r} is not one of "
+                    + ", ".join(RECEIVER_PROVENANCE))
     form = doc.get("form", "interactive")
     if form == "interactive":
         for side in ("client", "server"):
@@ -630,6 +641,9 @@ def main(argv=None) -> int:
     c.add_argument("--cases", help="comma-separated case ids; the others are skipped")
     c.add_argument("--participant", default="anonymous")
     c.add_argument("--participant-url")
+    c.add_argument("--receiver-provenance", choices=RECEIVER_PROVENANCE, default="unknown",
+                   help="how the side the participant built was written, as the participant "
+                        "states it (CROSSRUN.md Section 6); unknown unless stated")
     c.add_argument("--server-impl", default="aae-a2a-extension reference supplier")
     c.add_argument("--server-repo", default=REFERENCE_REPO)
     c.add_argument("--server-commit", help="commit SHA of the server under test")
