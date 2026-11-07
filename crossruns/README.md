@@ -15,19 +15,29 @@ Each run is credited to the participant who ran it, with the commits of both
 sides as recorded in the result file. A run with failures is listed as well;
 the failure is a finding about one of the two sides, not about the participant.
 
+The column *Receiver provenance* says how the side the participant built was
+written, as the participant states it ([CROSSRUN.md](../CROSSRUN.md), Section 6):
+`clean_room`, `reference_informed` or `unknown`. Where the participant has not
+said, it is `unknown`. It is never inferred from the result: a row with every
+case passed says nothing about how the receiver was written.
+
 A run holds for the cases it ran ([CROSSRUN.md](../CROSSRUN.md), Section 7.1).
 The column *Cases* names the commit of this repository whose `cases.json` the
 run used, its `cases_commit`; a later re-run against newer cases gets a row of
 its own.
 
-| Date | Participant | Role | Cases (commit) | Client (commit) | Server (commit) | Result | File |
-| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
-| 2026-10-30 | [Prasanna Bableshwar](https://github.com/bprasana/aae-a2a-crossrun) | offline | [`6c857ee`](https://github.com/MoltyCel/aae-a2a-extension/commit/6c857eeb60a9dac379954f5be5900a10616dfc7b) | receiver [`04cc8c5`](https://github.com/bprasana/aae-a2a-crossrun/commit/04cc8c5966b8a1a4f63495a4e4ce6d71f8f3cdc7) | none (offline) | 13 pass, 0 fail | [2026-10-30-prasanna-bableshwar-offline.json](2026-10-30-prasanna-bableshwar-offline.json) |
-| — | Songbo Bu | client | [`08f4114`](https://github.com/MoltyCel/aae-a2a-extension/commit/08f41146ac0d24d0d3e6212256fd9f3f58079adb) | — | — | "Songbo Bu: separately written raw JSON-RPC client against the reference supplier at 08f41146, XR-01 to XR-06, XR-20 and XR-24 as expected" | — |
-| — | Iman Schrock | offline | [`08f4114`](https://github.com/MoltyCel/aae-a2a-extension/commit/08f41146ac0d24d0d3e6212256fd9f3f58079adb) | — | — | "Iman Schrock (EMILIA Protocol): independent offline receiver check at 08f41146 using synthetic trust and clock inputs; XR-01, XR-06, XR-20 and XR-24 matched the tested expectations." | — |
-| 2026-11-02 | [Tymofii Pidlisnyi (Agent Passport System)](https://github.com/aeoess) | client | [`08f4114`](https://github.com/MoltyCel/aae-a2a-extension/commit/08f41146ac0d24d0d3e6212256fd9f3f58079adb) | [`58639f6`](https://github.com/Agent-Authority-Conformance/aps-conformance-suite/tree/58639f603686c5aea9ed529e7080dfc7a4539435/interop/aae-a2a-client-08f41146/client) | reference supplier [`08f4114`](https://github.com/MoltyCel/aae-a2a-extension/commit/08f41146ac0d24d0d3e6212256fd9f3f58079adb) | 24 pass, 0 fail | [2026-11-02-tymofii-pidlisnyi-client.json](2026-11-02-tymofii-pidlisnyi-client.json) |
+| Date | Participant | Role | Cases (commit) | Client (commit) | Server (commit) | Receiver provenance | Result | File |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| 2026-10-30 | [Prasanna Bableshwar](https://github.com/bprasana/aae-a2a-crossrun) | offline | [`6c857ee`](https://github.com/MoltyCel/aae-a2a-extension/commit/6c857eeb60a9dac379954f5be5900a10616dfc7b) | receiver [`04cc8c5`](https://github.com/bprasana/aae-a2a-crossrun/commit/04cc8c5966b8a1a4f63495a4e4ce6d71f8f3cdc7) | none (offline) | `clean_room` ([stated](https://github.com/a2aproject/A2A/issues/2391#issuecomment-6702944083)) | 13 pass, 0 fail | [2026-10-30-prasanna-bableshwar-offline.json](2026-10-30-prasanna-bableshwar-offline.json) |
+| — | Songbo Bu | client | [`08f4114`](https://github.com/MoltyCel/aae-a2a-extension/commit/08f41146ac0d24d0d3e6212256fd9f3f58079adb) | — | — | `unknown` | "Songbo Bu: separately written raw JSON-RPC client against the reference supplier at 08f41146, XR-01 to XR-06, XR-20 and XR-24 as expected" | — |
+| — | Iman Schrock | offline | [`08f4114`](https://github.com/MoltyCel/aae-a2a-extension/commit/08f41146ac0d24d0d3e6212256fd9f3f58079adb) | — | — | `unknown` | "Iman Schrock (EMILIA Protocol): independent offline receiver check at 08f41146 using synthetic trust and clock inputs; XR-01, XR-06, XR-20 and XR-24 matched the tested expectations." | — |
+| 2026-11-02 | [Tymofii Pidlisnyi (Agent Passport System)](https://github.com/aeoess) | client | [`08f4114`](https://github.com/MoltyCel/aae-a2a-extension/commit/08f41146ac0d24d0d3e6212256fd9f3f58079adb) | [`58639f6`](https://github.com/Agent-Authority-Conformance/aps-conformance-suite/tree/58639f603686c5aea9ed529e7080dfc7a4539435/interop/aae-a2a-client-08f41146/client) | reference supplier [`08f4114`](https://github.com/MoltyCel/aae-a2a-extension/commit/08f41146ac0d24d0d3e6212256fd9f3f58079adb) | `unknown` | 24 pass, 0 fail | [2026-11-02-tymofii-pidlisnyi-client.json](2026-11-02-tymofii-pidlisnyi-client.json) |
 
-The limits of that run, in the participant's own words
+The first third-party run is Prasanna Bableshwar's, in the offline form,
+against the cases at `6c857ee`. He states its provenance in
+[a2aproject/A2A#2391](https://github.com/a2aproject/A2A/issues/2391#issuecomment-6702944083):
+"The receiver was written from the profile text alone, so on the provenance
+field you are adding, this run reads clean-room." Its limits, in his own words
 ([findings.md](https://github.com/bprasana/aae-a2a-crossrun/blob/04cc8c5966b8a1a4f63495a4e4ce6d71f8f3cdc7/findings.md)):
 "The run was not blind. The expected results are published in the cases file
 and in the guide, and the implementer had read them." And: "It does not

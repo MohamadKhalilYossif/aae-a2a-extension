@@ -9,6 +9,7 @@
     "name": "<name to credit>",
     "url": "<optional: your project or profile URL>"
   },
+  "receiver_provenance": "<clean_room, reference_informed or unknown>",
   "client": {
     "implementation": "<name of the client side>",
     "repository": "<repository URL>",

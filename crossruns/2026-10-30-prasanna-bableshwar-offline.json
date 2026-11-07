@@ -10,6 +10,7 @@
     "name": "Prasanna Bableshwar",
     "url": "https://github.com/bprasana/aae-a2a-crossrun"
   },
+  "receiver_provenance": "clean_room",
   "receiver": {
     "implementation": "aae-a2a-crossrun, an independent receiver by Prasanna Bableshwar",
     "version": "1.0",

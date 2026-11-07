@@ -70,6 +70,7 @@ def _doc(results):
             "draft": crossrun.AAE_DRAFT, "cases_commit": SHA, "cases_sha256": digest,
             "run_at": "2026-10-28T00:00:00Z",
             "participant": {"name": "test", "url": None},
+            "receiver_provenance": "unknown",
             "client": {"implementation": "ref", "repository": crossrun.REFERENCE_REPO, "commit": SHA},
             "server": {"implementation": "ref", "repository": crossrun.REFERENCE_REPO, "commit": SHA},
             "cases": results, "summary": crossrun.summarize(results)}
@@ -374,6 +375,42 @@ def test_credit_table_names_the_state_of_the_cases():
     header = next(line for line in (ROOT / "crossruns" / "README.md").read_text().splitlines()
                   if line.startswith("| Date |"))
     assert "| Cases (commit) |" in header
+
+
+# --- receiver provenance (CROSSRUN.md 6) ---------------------------------------------
+
+def test_check_rejects_a_run_without_receiver_provenance(env):
+    spec, digest = _cases()
+    for doc in (_doc(_reference_results(env)), _offline(_reference_results(env))):
+        del doc["receiver_provenance"]
+        assert any(e.startswith("receiver_provenance missing")
+                   for e in crossrun.check_result(doc, spec, digest))
+
+
+def test_receiver_provenance_has_three_values(env):
+    spec, digest = _cases()
+    doc = _doc(_reference_results(env))
+    for value in crossrun.RECEIVER_PROVENANCE:
+        assert crossrun.check_result({**doc, "receiver_provenance": value}, spec, digest) == []
+    for value in ("clean-room", "independent", None, ""):
+        errs = crossrun.check_result({**doc, "receiver_provenance": value}, spec, digest)
+        assert any(e.startswith("receiver_provenance ") for e in errs), value
+
+
+def test_credit_table_names_the_receiver_provenance_of_every_row():
+    lines = (ROOT / "crossruns" / "README.md").read_text().splitlines()
+    header = next(line for line in lines if line.startswith("| Date |"))
+    col = [c.strip() for c in header.strip("|").split("|")].index("Receiver provenance")
+    rows = [line for line in lines if line.startswith("| 2") or line.startswith("| — |")]
+    assert rows
+    for row in rows:
+        cell = [c.strip() for c in row.strip("|").split("|")][col]
+        assert cell.split()[0].strip("`") in crossrun.RECEIVER_PROVENANCE, row
+    # A reported file and its row state the same value.
+    for p in sorted((ROOT / "crossruns").glob("2*.json")):
+        row = next(r for r in rows if f"]({p.name})" in r)
+        cell = [c.strip() for c in row.strip("|").split("|")][col]
+        assert cell.split()[0].strip("`") == json.loads(p.read_text())["receiver_provenance"]
 
 
 # --- XR-04 is an exception to the client rule of spec 6.4 (CROSSRUN.md 4) -----------

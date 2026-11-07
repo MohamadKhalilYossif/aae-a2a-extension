@@ -333,6 +333,7 @@ One JSON file per run, format `aae-a2a-crossrun/1`. See
 | `cases_sha256` | `sha256:` and the SHA-256 of `cases.json` as run; it must equal the hash of `cases.json` at `cases_commit` |
 | `run_at` | RFC 3339 UTC |
 | `participant` | `name` to credit, optional `url` |
+| `receiver_provenance` | how the implementation the participant built was written: `clean_room`, `reference_informed` or `unknown` (below); required |
 | `client`, `server` | `implementation`, `repository`, `commit` (40-character SHA), `dirty: true` if the working tree differed from that commit; `server.agent_card` |
 | `cases` | one entry per case, in order (below) |
 | `summary` | `{"pass", "fail", "skipped"}` counts |
@@ -361,6 +362,20 @@ presentation is to be admitted. For XR-20 and XR-24 each attempt passes on its
 own and the attempts are distinct tasks.
 For an error case, `jsonrpc_code` decides. A different `reason_code` is a note,
 not a failure: spec 8.4 lets a server use codes it does not list.
+
+`receiver_provenance` names how the side the participant built was written:
+the receiver in an offline run or a server run, the client in a client run.
+
+| Value | Meaning |
+| :-- | :-- |
+| `clean_room` | written from the profile text and this guide alone, without the source code of this repository |
+| `reference_informed` | the source code of this repository was read or used while writing it |
+| `unknown` | the participant has not stated either |
+
+The value is the participant's own statement. Where the participant has not
+made one, or a statement is not theirs, the value is `unknown`; a file without
+the member does not validate. Independence is never inferred from the number of cases that pass:
+a run that passes every case says nothing about how its receiver was written.
 
 ### 6.1 Offline receiver runs
 
@@ -392,7 +407,8 @@ Validate before reporting:
 `check` reads `cases.json` at `cases_commit` from this repository, compares its
 hash with `cases_sha256`, and checks the run against those cases, not the
 current ones. It recomputes `pass` or `fail` from what each entry records, so a
-file cannot claim a pass its own observations do not support. For an interactive
+file cannot claim a pass its own observations do not support. Every run needs
+`receiver_provenance` with one of its three values. For an interactive
 run it also requires commit SHAs for both sides and every `required` case; for
 an offline run it requires the members of Section 6.1 and every case.
 
@@ -408,8 +424,8 @@ an offline run it requires the members of Section 6.1 and every case.
 3. A failing case is worth reporting. Say in the pull request which side you
    think is wrong; if it is the reference, that is a bug here.
 
-Runs are credited with the participant's name, the commits of both sides and
-the state of the cases they ran.
+Runs are credited with the participant's name, the commits of both sides, the
+state of the cases they ran and the receiver provenance the participant states.
 
 ### 7.1 A run holds for the cases it ran
 
