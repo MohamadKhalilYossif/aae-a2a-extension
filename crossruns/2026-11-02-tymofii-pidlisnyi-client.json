@@ -8,7 +8,7 @@
   "participant": {
     "name": "Tymofii Pidlisnyi (Agent Passport System)"
   },
-  "receiver_provenance": "unknown",
+  "receiver_provenance": "reference_informed",
   "client": {
     "implementation": "aae-client.mjs, independent Node.js client (no reference code)",
     "repository": "https://github.com/Agent-Authority-Conformance/aps-conformance-suite/tree/58639f603686c5aea9ed529e7080dfc7a4539435/interop/aae-a2a-client-08f41146/client",
