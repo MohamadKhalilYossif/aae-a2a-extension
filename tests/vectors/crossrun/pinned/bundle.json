@@ -39,7 +39,7 @@
     "authenticator": "base64url without padding of HMAC-SHA256(key = key, message = UTF-8(random + '.' + expiry + '.' + aud + '.' + aae_id)), aud and aae_id as in the challenge",
     "nonce": "random + '.' + expiry + '.' + authenticator"
   },
-  "description": "Fixed bytes for XR-01, XR-06, XR-20 and XR-24 at verify_at. Present the cases in order, each attempt as a new task. authorization is the outcome of every step but step 5; admission is step 5 against what the server has already accepted. TEST-ONLY keys.",
+  "description": "Fixed bytes for XR-01, XR-06, XR-20, XR-24, XR-25 and XR-26 at verify_at. Present the cases in order, each attempt as a new task. authorization is the outcome of every step but step 5; admission is step 5 against what the server has already accepted. For XR-25 and XR-26, psea_payload_hash of psea_proof is compared with the returned request_digest as decoded octets. TEST-ONLY keys.",
   "cases": [
     {
       "id": "XR-01",
@@ -269,6 +269,86 @@
           }
         }
       ]
+    },
+    {
+      "id": "XR-25",
+      "aae": "XR-25.aae.jws",
+      "request_part": {
+        "skill": "place-order",
+        "transaction": {
+          "amount": 120,
+          "currency": "EUR",
+          "items": [
+            {
+              "sku": "PAPER-A4",
+              "qty": 20
+            }
+          ]
+        }
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "challenge": {
+            "nonce": "1051a5797c278e9507e0064d1c1e4a13.1793610300.XdSISRSNkYJDOEquzy84QKA9QaOcANKv9TXg1Em3XFc",
+            "aud": "https://supplier.example/a2a/jsonrpc",
+            "aae_id": "urn:uuid:70a844e2-fca4-59c5-a229-477156fc7f20"
+          },
+          "challenge_response": "XR-25.1.response.jws",
+          "expect": {
+            "kind": "task",
+            "task_state": "TASK_STATE_COMPLETED",
+            "verdict": "ACCEPT",
+            "request_digest": "sha256:84559612f1f46ec0a03f8c448905af075ba4edf66e529b15b50f69c85a68b59a",
+            "psea": {
+              "psea_payload_hash": "hFWWEvH0bsCgP4xEiQWvB1uk7fZuUpsVtQ9pyFpotZo=",
+              "same_octets": true,
+              "binding": "ACCEPT"
+            }
+          }
+        }
+      ],
+      "psea_proof": "XR-25.psea.jws"
+    },
+    {
+      "id": "XR-26",
+      "aae": "XR-26.aae.jws",
+      "request_part": {
+        "skill": "place-order",
+        "transaction": {
+          "amount": 120,
+          "currency": "EUR",
+          "items": [
+            {
+              "sku": "PAPER-A4",
+              "qty": 20
+            }
+          ]
+        }
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "challenge": {
+            "nonce": "f97a5ec713ee5caacc13c081c3f0a070.1793610300.OggCYxFUue3pCnElvep9tNb8WHdihTMadgEtE0afgEE",
+            "aud": "https://supplier.example/a2a/jsonrpc",
+            "aae_id": "urn:uuid:e50c1473-8c51-5022-9a22-3beaabdba3f8"
+          },
+          "challenge_response": "XR-26.1.response.jws",
+          "expect": {
+            "kind": "task",
+            "task_state": "TASK_STATE_COMPLETED",
+            "verdict": "ACCEPT",
+            "request_digest": "sha256:84559612f1f46ec0a03f8c448905af075ba4edf66e529b15b50f69c85a68b59a",
+            "psea": {
+              "psea_payload_hash": "/SSQliogsNgiPWkkj/pfBzGA55GGQpUkftHu2GYfSPk=",
+              "same_octets": false,
+              "binding": "REFUSE"
+            }
+          }
+        }
+      ],
+      "psea_proof": "XR-26.psea.jws"
     }
   ]
 }

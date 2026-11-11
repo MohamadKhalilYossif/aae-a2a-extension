@@ -1,12 +1,14 @@
 """The pinned bundle (CROSSRUN.md, "Pinned bundle"): fixed AAE and
-challenge-response bytes for XR-01, XR-06, XR-20 and XR-24 at one fixed verification
-time, with the profile parameters, DID documents and accepted issuers they were
+challenge-response bytes for XR-01, XR-06, XR-20, XR-24, XR-25 and XR-26 at one
+fixed verification time, the PSEA proofs of XR-25 and XR-26, with the profile parameters, DID documents and accepted issuers they were
 made for, and a manifest of hashes.
 
 A verifier can check the bytes without running a client, and the reference
 supplier started with `--pinned` decides them the way the bundle expects. Every
 input is derived from public labels, and Ed25519 signatures are deterministic,
-so `python -m aae_a2a.crossrun pin` rebuilds the bundle byte for byte.
+so `python -m aae_a2a.crossrun pin` rebuilds the bundle byte for byte. The PSEA
+proofs are ES256, which is randomized; they are copied from
+tests/vectors/crossrun/psea/, where scripts/make-psea-proofs.py wrote them once.
 
 Two things are fixed here that a deployment never fixes: the nonce key and the
 random part of the nonce. Both are derived from public labels so that the
@@ -32,6 +34,7 @@ from .verifier import AaeVerifier, Reject
 ROOT = Path(__file__).resolve().parent.parent
 PINNED_DIR = ROOT / "tests" / "vectors" / "crossrun" / "pinned"
 DID_DIR = ROOT / "tests" / "vectors" / "crossrun" / "did"
+PSEA_DIR = ROOT / "tests" / "vectors" / "crossrun" / "psea"
 BUNDLE_FORMAT = "aae-a2a-crossrun-pinned/1"
 
 VERIFY_AT = datetime(2026, 11, 2, 9, 0, 0, tzinfo=timezone.utc)
@@ -78,6 +81,18 @@ CASES = [
     # bytes, each as a new task with a new nonce.
     {"id": "XR-24", "transaction": SMALL, "single_use": False,
      "expect": [_accepted(DIGEST_SMALL), _accepted(DIGEST_SMALL)]},
+    # XR-25 and XR-26 send the request part of XR-01 and carry a PSEA proof; the
+    # expectation is that of cases.json. XR-26's proof is over amount 121.
+    {"id": "XR-25", "transaction": ORDER, "single_use": False, "psea": True,
+     "expect": [{"kind": "task", "task_state": "TASK_STATE_COMPLETED", "verdict": "ACCEPT",
+                 "request_digest": DIGEST_ORDER,
+                 "psea": {"psea_payload_hash": "hFWWEvH0bsCgP4xEiQWvB1uk7fZuUpsVtQ9pyFpotZo=",
+                          "same_octets": True, "binding": "ACCEPT"}}]},
+    {"id": "XR-26", "transaction": ORDER, "single_use": False, "psea": True,
+     "expect": [{"kind": "task", "task_state": "TASK_STATE_COMPLETED", "verdict": "ACCEPT",
+                 "request_digest": DIGEST_ORDER,
+                 "psea": {"psea_payload_hash": "/SSQliogsNgiPWkkj/pfBzGA55GGQpUkftHu2GYfSPk=",
+                          "same_octets": False, "binding": "REFUSE"}}]},
 ]
 
 
@@ -143,9 +158,14 @@ def build(out: Path = PINNED_DIR) -> list[Path]:
                                          demo_key("buyer")) + "\n").encode("ascii"))
             attempts.append({"attempt": n, "challenge": challenge,
                              "challenge_response": resp_file, "expect": expect})
-        cases.append({"id": c["id"], "aae": aae_file,
-                      "request_part": {"skill": "place-order", "transaction": c["transaction"]},
-                      "attempts": attempts})
+        entry = {"id": c["id"], "aae": aae_file,
+                 "request_part": {"skill": "place-order", "transaction": c["transaction"]},
+                 "attempts": attempts}
+        if c.get("psea"):
+            psea_file = f"{c['id']}.psea.jws"
+            put(psea_file, (PSEA_DIR / psea_file).read_bytes())
+            entry["psea_proof"] = psea_file
+        cases.append(entry)
     bundle = {
         "format": BUNDLE_FORMAT,
         "profile": EXTENSION_URI,
@@ -168,10 +188,12 @@ def build(out: Path = PINNED_DIR) -> list[Path]:
                                    "message = UTF-8(random + '.' + expiry + '.' + aud + '.' + "
                                    "aae_id)), aud and aae_id as in the challenge",
                   "nonce": "random + '.' + expiry + '.' + authenticator"},
-        "description": "Fixed bytes for XR-01, XR-06, XR-20 and XR-24 at verify_at. Present the "
-                       "cases in order, each attempt as a new task. authorization is the "
-                       "outcome of every step but step 5; admission is step 5 against "
-                       "what the server has already accepted. TEST-ONLY keys.",
+        "description": "Fixed bytes for XR-01, XR-06, XR-20, XR-24, XR-25 and XR-26 at "
+                       "verify_at. Present the cases in order, each attempt as a new task. "
+                       "authorization is the outcome of every step but step 5; admission "
+                       "is step 5 against what the server has already accepted. For XR-25 "
+                       "and XR-26, psea_payload_hash of psea_proof is compared with the "
+                       "returned request_digest as decoded octets. TEST-ONLY keys.",
         "cases": cases,
     }
     put("bundle.json", _dump(bundle))

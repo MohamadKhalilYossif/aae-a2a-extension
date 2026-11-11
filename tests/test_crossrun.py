@@ -296,7 +296,8 @@ def test_pinned_bytes_give_the_expected_results_with_a_fixed_clock():
     client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE_URL)
     results = run(crossrun.run_pinned(BASE_URL, PINNED, httpx_client=client))
     assert [(r["id"], r["result"]) for r in results] == [("XR-01", "pass"), ("XR-06", "pass"),
-                                                         ("XR-20", "pass"), ("XR-24", "pass")], \
+                                                         ("XR-20", "pass"), ("XR-24", "pass"),
+                                                         ("XR-25", "pass"), ("XR-26", "pass")], \
         results
 
 
@@ -441,7 +442,10 @@ def test_a_client_run_may_skip_xr04(env):
 
 def test_xr04_stays_required_for_a_run_against_08f41146(env):
     old, digest = crossrun.load_cases_at(BASE_08F41146)
-    full = {**_doc(_reference_results(env)), "cases_commit": BASE_08F41146, "cases_sha256": digest}
+    # Only the cases of that commit: cases added later are not part of its set.
+    ids = {c["id"] for c in old["cases"]}
+    results = [r for r in _reference_results(env) if r["id"] in ids]
+    full = {**_doc(results), "cases_commit": BASE_08F41146, "cases_sha256": digest}
     assert crossrun.check_reported(full) == []
     skipped = _without_xr04(full["cases"])
     doc = {**full, "cases": skipped, "summary": crossrun.summarize(skipped)}

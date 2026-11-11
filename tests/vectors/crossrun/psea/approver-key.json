@@ -1,0 +1,11 @@
+{
+  "description": "TEST-ONLY P-256 key of the PSEA approver of XR-25 and XR-26. d = SHA-256(UTF-8('aae-a2a-extension/testkey/v1/psea-approver')) as a big-endian integer. Public by construction; never use it for anything but tests.",
+  "kid": "psea-approver",
+  "jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "q_6J2TMnu1Fhdunfomm_D5WaJl6W3V0RUxD17j6H2f4",
+    "y": "gkbniVUx2LZVjhIak6srppyYQeiCa0rrUEOw3gsm0u4",
+    "d": "rsqiBzeIMSBY4o2o_Zx6TpFgV1Zsv8bC-kzuzm0JRAY"
+  }
+}

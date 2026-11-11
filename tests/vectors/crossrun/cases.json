@@ -231,6 +231,28 @@
          "authorization": {"verdict": "ACCEPT", "steps_passed": [1, 2, 3, 4, 6, 7]}, "admission": {"admitted": true}},
         {"kind": "task", "task_state": "TASK_STATE_COMPLETED", "verdict": "ACCEPT", "request_digest": "sha256:7081684b67799fdd4045a25d028f770a8254746ff279dbabb0486bdb7eeb4176",
          "authorization": {"verdict": "ACCEPT", "steps_passed": [1, 2, 3, 4, 6, 7]}, "admission": {"admitted": true}}]}
+    },
+    {
+      "id": "XR-25",
+      "title": "PSEA proof over the request part: psea_payload_hash and request_digest are the same 32 octets, compared decoded (spec 8.5)",
+      "client_side": "optional",
+      "request_part": {"skill": "place-order", "transaction": {"amount": 120, "currency": "EUR", "items": [{"sku": "PAPER-A4", "qty": 20}]}},
+      "aae": "valid", "challenge_response": "valid", "activate": true,
+      "psea_proof": "psea/XR-25.psea.jws",
+      "expect": {"kind": "task", "task_state": "TASK_STATE_COMPLETED", "verdict": "ACCEPT",
+                 "request_digest": "sha256:84559612f1f46ec0a03f8c448905af075ba4edf66e529b15b50f69c85a68b59a",
+                 "psea": {"psea_payload_hash": "hFWWEvH0bsCgP4xEiQWvB1uk7fZuUpsVtQ9pyFpotZo=", "same_octets": true, "binding": "ACCEPT"}}
+    },
+    {
+      "id": "XR-26",
+      "title": "Counterexample to XR-25: the PSEA proof is over the request part with amount 121, so the octets differ and the binding is refused (spec 8.5)",
+      "client_side": "optional",
+      "request_part": {"skill": "place-order", "transaction": {"amount": 120, "currency": "EUR", "items": [{"sku": "PAPER-A4", "qty": 20}]}},
+      "aae": "valid", "challenge_response": "valid", "activate": true,
+      "psea_proof": "psea/XR-26.psea.jws",
+      "expect": {"kind": "task", "task_state": "TASK_STATE_COMPLETED", "verdict": "ACCEPT",
+                 "request_digest": "sha256:84559612f1f46ec0a03f8c448905af075ba4edf66e529b15b50f69c85a68b59a",
+                 "psea": {"psea_payload_hash": "/SSQliogsNgiPWkkj/pfBzGA55GGQpUkftHu2GYfSPk=", "same_octets": false, "binding": "REFUSE"}}
     }
   ]
 }

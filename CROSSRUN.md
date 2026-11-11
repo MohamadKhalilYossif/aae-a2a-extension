@@ -64,6 +64,7 @@ produce the result file itself (Section 6).
 | DID documents | [`tests/vectors/crossrun/did/`](tests/vectors/crossrun/did/) |
 | Test keys | [`tests/vectors/crossrun/test-keys.json`](tests/vectors/crossrun/test-keys.json) |
 | `request_digest` vectors | [`tests/vectors/request-digest.json`](tests/vectors/request-digest.json), spec Appendix B |
+| PSEA proofs of XR-25 and XR-26, and their test key | [`tests/vectors/crossrun/psea/`](tests/vectors/crossrun/psea/) |
 | -02 Section 5 vectors | [MoltyCel/aae-conformance-vectors](https://github.com/MoltyCel/aae-conformance-vectors) at `2f117799c604f258e67d5c13d69fea63881bdae0` (spec Section 13) |
 
 The test keys are Ed25519 seeds derived as
@@ -178,6 +179,8 @@ cases. A `client` run must cover the `required` ones and may skip the
 | XR-22 | optional | `hold` / `valid`, ratification `principal` | `{"action": {"verb": "pay", "category": "office-supplies"}, "amount": 120, "currency": "EUR"}` | `TASK_STATE_COMPLETED`, `ACCEPT`, ratification `RATIFIED` | `sha256:91d816ca447777616f133386a3be2d0129be4e7a5edd29b5f7aabd6b2aa26c70` |
 | XR-23 | optional | `hold` / `valid`, ratification `stranger` | `{"action": {"verb": "pay", "category": "office-supplies"}, "amount": 120, "currency": "EUR"}` | `TASK_STATE_INPUT_REQUIRED`, `PENDING`, ratification `REJECTED` | `sha256:91d816ca447777616f133386a3be2d0129be4e7a5edd29b5f7aabd6b2aa26c70` |
 | XR-24 | optional | `valid` / `valid`, the same AAE presented twice | `{"amount": 120, "currency": "EUR"}` | both `TASK_STATE_COMPLETED`, `ACCEPT` | `sha256:7081684b67799fdd4045a25d028f770a8254746ff279dbabb0486bdb7eeb4176` |
+| XR-25 | optional | `valid` / `valid`, PSEA proof `psea/XR-25.psea.jws` | `{"amount": 120, "currency": "EUR", "items": [{"sku": "PAPER-A4", "qty": 20}]}` | `TASK_STATE_COMPLETED`, `ACCEPT`; PSEA binding `ACCEPT`, the same 32 octets | `sha256:84559612f1f46ec0a03f8c448905af075ba4edf66e529b15b50f69c85a68b59a` |
+| XR-26 | optional | `valid` / `valid`, PSEA proof `psea/XR-26.psea.jws`, over `amount` 121 | `{"amount": 120, "currency": "EUR", "items": [{"sku": "PAPER-A4", "qty": 20}]}` | `TASK_STATE_COMPLETED`, `ACCEPT`; PSEA binding `REFUSE`, the octets differ | `sha256:84559612f1f46ec0a03f8c448905af075ba4edf66e529b15b50f69c85a68b59a` |
 
 XR-21 to XR-23 cover a deferred decision (spec Section 7.6). The grant's
 verdict is PENDING, so the supplier holds the task in
@@ -224,6 +227,39 @@ as written in `cases.json`, outside its own rule, only for this case. In the
 cases of commit `08f41146` XR-04 is still required for a client-side run; a
 run against those cases is checked with them (Section 7.1) and stays valid.
 
+XR-25 and XR-26 carry a proof of draft-yossif-psea-03 next to the exchange.
+Both send the request part of XR-01, and the server decides it as it decides
+XR-01. The PSEA proof is a compact JWS whose claim `psea_payload_hash` is
+SHA-256 over the RFC 8785 (JCS) form of the payload the approver signed,
+written in standard Base64 with padding. Spec Section 8.5 computes
+`request_digest` as SHA-256 over the JCS form of the request part, written as
+`sha256:` and lowercase hex. A proof over the request part therefore names the
+same 32 octets as `request_digest`, in an encoding that never agrees with it
+as a string. The client decodes both and compares the octets, as
+[`aae_a2a/psea.py`](aae_a2a/psea.py) does: the same octets give the PSEA
+binding `ACCEPT`, different octets or a value in another encoding give
+`REFUSE`.
+
+- XR-25: the proof is over the request part sent. Its `psea_payload_hash`
+  `hFWWEvH0bsCgP4xEiQWvB1uk7fZuUpsVtQ9pyFpotZo=` decodes to the octets of
+  `request_digest`, and the binding is `ACCEPT`.
+- XR-26 is its counterexample: the proof is over the same request part with
+  `amount` 121 instead of 120. Its `psea_payload_hash`
+  `/SSQliogsNgiPWkkj/pfBzGA55GGQpUkftHu2GYfSPk=` decodes to the octets of
+  `sha256:fd2490962a20b0d8223d69248ffa5f073180e791864295247ed1eed8661f48f9`,
+  the octets differ, and the binding is `REFUSE`.
+
+The proofs were made with the Attester of the draft-yossif-psea-03 reference
+implementation ([yuthent/psea-spec](https://github.com/yuthent/psea-spec)
+`conformance/src`, commit `5dc83800bcdf5747a282436437b1bd24ce831795`) by
+[`scripts/make-psea-proofs.py`](scripts/make-psea-proofs.py), and are signed
+with ES256 under the P-256 test key in
+[`tests/vectors/crossrun/psea/approver-key.json`](tests/vectors/crossrun/psea/approver-key.json),
+derived from a public label as the Ed25519 test keys are. ES256 signatures are
+randomized, so the committed proofs are the vectors. Only the comparison is
+part of these cases. The signature, freshness, user verification and replay of
+the proof are a PSEA Verifier's checks and are not decided here.
+
 ## 5. Running
 
 Install once (Python 3.12): `make install`, or
@@ -240,7 +276,7 @@ This starts the reference supplier and the reference buyer as two processes on
 `127.0.0.1`, runs all cases, writes `.crossrun/local.json`, validates it, and
 logs every decision the supplier made to `.crossrun/supplier-decisions.jsonl`.
 
-**Pinned bundle** — fixed bytes for XR-01, XR-06, XR-20 and XR-24, for a verifier
+**Pinned bundle** — fixed bytes for XR-01, XR-06, XR-20, XR-24, XR-25 and XR-26, for a verifier
 that checks bytes rather than running a client, and for comparing two runs
 byte for byte. [`tests/vectors/crossrun/pinned/`](tests/vectors/crossrun/pinned/)
 holds:
@@ -248,8 +284,9 @@ holds:
 | File | Content |
 | :-- | :-- |
 | [`bundle.json`](tests/vectors/crossrun/pinned/bundle.json) | `verify_at`, the card `params` (audience `https://supplier.example/a2a/jsonrpc`, skills, DID methods, accepted issuers), the nonce derivation, and per case the request part, the AAE file and per attempt the challenge, the response file and the expected result with `authorization` and `admission` |
-| `XR-01.aae.jws`, `XR-06.aae.jws`, `XR-20.aae.jws`, `XR-24.aae.jws` | the AAEs, one per case and presented in every attempt of that case; XR-20's is single-use |
-| `XR-01.1.response.jws`, `XR-06.1.response.jws`, `XR-20.1.response.jws`, `XR-20.2.response.jws`, `XR-24.1.response.jws`, `XR-24.2.response.jws` | the challenge responses, one per attempt, `iat` equal to `verify_at` |
+| `XR-01.aae.jws`, `XR-06.aae.jws`, `XR-20.aae.jws`, `XR-24.aae.jws`, `XR-25.aae.jws`, `XR-26.aae.jws` | the AAEs, one per case and presented in every attempt of that case; XR-20's is single-use |
+| `XR-01.1.response.jws`, `XR-06.1.response.jws`, `XR-20.1.response.jws`, `XR-20.2.response.jws`, `XR-24.1.response.jws`, `XR-24.2.response.jws`, `XR-25.1.response.jws`, `XR-26.1.response.jws` | the challenge responses, one per attempt, `iat` equal to `verify_at` |
+| `XR-25.psea.jws`, `XR-26.psea.jws` | the PSEA proofs of [`tests/vectors/crossrun/psea/`](tests/vectors/crossrun/psea/), copied; `bundle.json` names each as the case's `psea_proof` |
 | `did/` | the DID documents of [`tests/vectors/crossrun/did/`](tests/vectors/crossrun/did/), copied |
 | [`MANIFEST.sha256`](tests/vectors/crossrun/pinned/MANIFEST.sha256) | the SHA-256 of every other file in the bundle; `shasum -a 256 -c MANIFEST.sha256` in the directory checks them |
 
@@ -288,7 +325,8 @@ with any run. Present the cases in order and each attempt as a new task. The
 client checks that every challenge equals the pinned one before it answers, and
 compares each attempt with its expected result. `python -m aae_a2a.crossrun pin`
 rebuilds the bundle; the result is byte-identical, since every input is fixed
-and Ed25519 signatures are deterministic.
+and Ed25519 signatures are deterministic. The PSEA proofs are copied, not
+signed again.
 
 **Role `server`** — the reference buyer against your supplier:
 
@@ -352,6 +390,7 @@ Each entry in `cases`:
 | `jsonrpc_code`, `reason_code` | JSON-RPC error | the error code and `ErrorInfo.metadata.reason_code` if present |
 | `attempts` | a case with several presentations (XR-20, XR-24) | one entry per presentation, in order, each with the members above that apply |
 | `ratification_status` | a ratification was sent | `result.ratification.status`, `RATIFIED` or `REJECTED` |
+| `psea_payload_hash`, `psea_binding` | a case with a PSEA proof (XR-25, XR-26) | the proof's `psea_payload_hash` as it stands in the proof, and `ACCEPT` or `REFUSE` from comparing its decoded octets with those of `request_digest` (Section 4) |
 | `notes` | optional | free text, for example a differing `reason_code` |
 
 A case passes when `task_state`, `verdict`, `request_digest` and, for a
@@ -360,6 +399,9 @@ rejection, `step` equal the expected values, an accepted case has
 where a case states `admission`, the verdict is `ACCEPT` exactly when the
 presentation is to be admitted. For XR-20 and XR-24 each attempt passes on its
 own and the attempts are distinct tasks.
+For XR-25 and XR-26, `psea_payload_hash` equals the case's and `psea_binding`
+equals the expected binding and follows from the recorded `psea_payload_hash`
+and `request_digest`.
 For an error case, `jsonrpc_code` decides. A different `reason_code` is a note,
 not a failure: spec 8.4 lets a server use codes it does not list.
 

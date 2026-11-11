@@ -34,7 +34,8 @@ from .buyer import BuyerAgent, task_result
 from .challenge import utc_now
 from .constants import AAE_DRAFT, EXTENSION_URI
 from .digest import request_digest
-from .jose import b64url_encode, sign_compact
+from .jose import b64url_decode, b64url_encode, sign_compact
+from .psea import PseaHashError, covers_same_request
 from .testkeys import (PARTIES, buyer_constraints, buyer_mandate, demo_key, did_document,
                        did_of, held_mandate, issue_buyer_aae, issue_supplier_aae, kid_of,
                        make_vc, ratification_proof, PRINCIPAL_DID)
@@ -52,6 +53,9 @@ OFFLINE_AUDIENCE = "https://supplier.example/a2a/jsonrpc"
 # states it (CROSSRUN.md Section 6). Absent or unstated is "unknown"; the case
 # counts never stand in for it.
 RECEIVER_PROVENANCE = ("clean_room", "reference_informed", "unknown")
+# XR-25 and XR-26 carry a PSEA proof (draft-yossif-psea-03) over a request part;
+# its file is named relative to the directory of cases.json.
+PSEA_BINDINGS = ("ACCEPT", "REFUSE")
 
 
 def load_cases(path: Path = CASES_FILE) -> tuple[dict, str]:
@@ -232,6 +236,25 @@ def evaluate(case: dict, obs: dict, task_ids: dict[str, str]) -> tuple[str, list
     if "ratification_status" in exp and obs.get("ratification_status") != exp["ratification_status"]:
         fails.append(f"ratification_status {obs.get('ratification_status')} != "
                      f"{exp['ratification_status']}")
+    psea = exp.get("psea")
+    if psea is not None:
+        # Recomputed from what the entry records, so a file cannot claim a
+        # binding its own request_digest does not give.
+        if obs.get("psea_payload_hash") != psea["psea_payload_hash"]:
+            fails.append(f"psea_payload_hash {obs.get('psea_payload_hash')} != "
+                         f"{psea['psea_payload_hash']}")
+        try:
+            same = covers_same_request(str(obs.get("psea_payload_hash")),
+                                       str(obs.get("request_digest")))
+        except PseaHashError:
+            same = False
+        if same != psea["same_octets"]:
+            fails.append(f"same_octets {same} != {psea['same_octets']}")
+        if obs.get("psea_binding") != psea["binding"]:
+            fails.append(f"psea_binding {obs.get('psea_binding')} != {psea['binding']}")
+        elif obs.get("psea_binding") != ("ACCEPT" if same else "REFUSE"):
+            fails.append(f"psea_binding {obs.get('psea_binding')} does not follow from "
+                         f"psea_payload_hash and request_digest")
     # Admission is step 5 against what the server has already accepted. A server
     # reports it through the verdict; authorization (every step but 5) is not
     # observable from a rejection at step 5 and is checked on the pinned bundle.
@@ -243,6 +266,24 @@ def evaluate(case: dict, obs: dict, task_ids: dict[str, str]) -> tuple[str, list
         if not obs.get("task_id") or obs.get("task_id") == task_ids.get(other):
             fails.append(f"task_id equals that of {other}")
     return ("fail" if fails else "pass"), fails + notes
+
+
+def psea_binding(proof: str, digest: str | None) -> tuple[str | None, str]:
+    """The client side of XR-25 and XR-26 (CROSSRUN.md 4): psea_payload_hash of
+    the PSEA proof against the request_digest the server returned, compared as
+    decoded octets (aae_a2a/psea.py). ACCEPT when they are the same 32 octets,
+    REFUSE otherwise, including a value in the wrong encoding. The signature of
+    the proof is not checked here; that is a PSEA Verifier's job."""
+    try:
+        claims = json.loads(b64url_decode(proof.split(".")[1]))
+        value = claims["psea_payload_hash"]
+    except (IndexError, KeyError, TypeError, ValueError):
+        return None, "REFUSE"
+    try:
+        same = covers_same_request(value, digest)
+    except PseaHashError:
+        same = False
+    return value, "ACCEPT" if same else "REFUSE"
 
 
 def observe_task(task) -> dict:
@@ -302,6 +343,11 @@ async def run_cases(base_url: str, cases: list[dict], only: set[str] | None = No
                 obs = attempts[0]
                 if obs.get("task_id"):
                     task_ids[case["id"]] = obs["task_id"]
+                if "psea_proof" in case:
+                    proof = (CASES_FILE.parent / case["psea_proof"]).read_text(
+                        encoding="ascii").strip()
+                    value, binding = psea_binding(proof, obs.get("request_digest"))
+                    obs.update(psea_payload_hash=value, psea_binding=binding)
             result, notes = evaluate(case, obs, task_ids)
             out.append({"id": case["id"], "result": result, **obs,
                         **({"notes": notes} if notes else {})})
@@ -338,6 +384,10 @@ async def run_pinned(base_url: str, bundle_dir: Path, httpx_client=None) -> list
                 except A2AError as exc:
                     got.append(observe_error(exc))
             exp = [att["expect"] for att in case["attempts"]]
+            if "psea_proof" in case:
+                value, binding = psea_binding(pinned.read_jws(bundle_dir, case["psea_proof"]),
+                                              got[0].get("request_digest"))
+                got[0].update(psea_payload_hash=value, psea_binding=binding)
             if len(exp) == 1:
                 result, notes = evaluate({"id": case["id"], "expect": exp[0]}, got[0], task_ids)
                 entry = {"id": case["id"], "result": result, **got[0]}
@@ -362,6 +412,8 @@ def _print_results(results: list[dict]) -> None:
                 line += f" step {o['step']} {o.get('reason_code')}"
             if o.get("request_digest"):
                 line += f" {o['request_digest'][:19]}..."
+            if o.get("psea_binding"):
+                line += f" psea {o['psea_binding']}"
         for n in r.get("notes", []):
             line += f"\n        {n}"
         print(line)
